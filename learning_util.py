@@ -1,4 +1,3 @@
-import numpy as np
 import string
 import itertools
 import random
@@ -8,10 +7,12 @@ def random_ssn(number: int = 1, unique: bool = False):
     """
     Return a random SSN or list of SSN's
 
-    :param number: Number of SSN's to return. If blank, None or 1, a single string will be returned. Default: None
-    :param unique: Boolean indicating if returned SSN's should be unique.
-    :return: SSN string or list of SSN strings.
-    :rtype: str or list[str]
+    Args:
+        number (int): Number of SSN's to return. If blank, None or 1, a single string will be returned. (default is 1)
+        unique (boolean): Boolean indicating if returned SSN's should be unique. (default is False)
+
+    Returns:
+        List[str]: An SSN string or list of SSN strings
     """
     ssn_length = 10 ** 9
     if number is None or number == 1:
@@ -45,9 +46,21 @@ def random_ssn(number: int = 1, unique: bool = False):
             return temp_list
 
 
-# Reference:
-# https://stackoverflow.com/questions/43119744/python-generate-all-possible-strings-of-length-n
 def generate_strings(length=2, chars=string.digits):
+    """Returns a generator for all combinations of strings of length length using characters specified in chars.
+
+    Reference:
+    https://stackoverflow.com/questions/43119744/python-generate-all-possible-strings-of-length-n
+
+    Args:
+        length (int): Length of individual string to be generated
+        chars (str): String of characters to be used for cartesian product
+
+    Yields:
+        Generator[str]:
+            A generator for all combinations of strings of length length using characters specified in chars.
+    """
+    #
     for item in itertools.product(chars, repeat=length):
         yield "".join(item)
 
@@ -65,3 +78,12 @@ def reservoir_sample(iterable, k):
         if j < k:
             sample[j] = item  # replace item with gradually decreasing probability
     return sample
+
+if __name__ == "__main__":
+    #Testing/performance
+    import timeit
+    print(random_ssn(None))
+    print("Random SSN, 20, non-unique")
+    print(random_ssn(20))
+    t = timeit.Timer(stmt="lu.random_ssn(20)", setup="import learning_util as lu")
+    print("Average runtime (n=1000 times): %f" % t.timeit(1000))
