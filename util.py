@@ -3,7 +3,7 @@ import itertools
 import random
 
 
-def int_to_ssn(x: int = 0, dashes=True):
+def int_to_ssn(x: int = 0, dashes: bool = True):
     """Converts an int into SSN format
 
     Args:
@@ -73,7 +73,7 @@ def random_ssn(number: int = 1, dashes: bool = True, unique: bool = False):
         return ssn_list
 
 
-def generate_strings(length=2, chars=string.digits):
+def generate_strings(length: int = 2, chars: str = string.digits):
     """Returns a generator for all combinations of strings of length length using characters specified in chars.
 
     Reference:
