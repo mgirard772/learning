@@ -1,6 +1,7 @@
 import string
 import itertools
 import random
+import sys
 
 
 def int_to_ssn(x: int = 0, dashes: bool = True):
@@ -106,28 +107,3 @@ def reservoir_sample(iterable, k):
             sample[j] = item  # replace item with gradually decreasing probability
     return sample
 
-
-if __name__ == "__main__":
-    # Testing/performance
-    import timeit
-    test_iterations = 1000
-
-    print("Random SSN, 10, non-unique, w/ dashes")
-    print(random_ssn(10))
-    t = timeit.Timer(stmt="util.random_ssn(10)", setup="import util")
-    print(f"Average runtime (n={test_iterations} times): %f\n" % t.timeit(test_iterations))
-
-    print("Random SSN, 10, unique, w/ dashes")
-    print(random_ssn(10, unique=True))
-    t = timeit.Timer(stmt="util.random_ssn(10, unique=True)", setup="import util")
-    print(f"Average runtime (n={test_iterations} times): %f\n" % t.timeit(test_iterations))
-
-    print("Random SSN, 10, non-unique, w/o dashes")
-    print(random_ssn(10, dashes=False))
-    t = timeit.Timer(stmt="util.random_ssn(10, dashes=False)", setup="import util")
-    print(f"Average runtime (n={test_iterations} times): %f\n" % t.timeit(test_iterations))
-
-    print("Random SSN, 10, unique, w/o dashes")
-    print(random_ssn(10, unique=True, dashes=False))
-    t = timeit.Timer(stmt="util.random_ssn(10, unique=True, dashes=False)", setup="import util")
-    print(f"Average runtime (n={test_iterations} times): %f" % t.timeit(test_iterations))
