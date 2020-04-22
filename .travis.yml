@@ -8,6 +8,6 @@ before_install:
   - pip install codecov
 install:
   - pip install ".[test]" .
-script: pytest
+script: pytest --cov=src tests/
 after_success:
   - codecov
