@@ -1,0 +1,10 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.DS_store
+*__pycache__*
+src.egg-info
+.idea
+.coverage
+*.Rproj
