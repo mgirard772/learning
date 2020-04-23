@@ -1,0 +1,100 @@
+---
+title: "Deductible Comparison"
+output:
+  html_document: default
+  pdf_document: default
+header-includes: 
+  - \usepackage{subfig}
+  - \captionsetup[figure]{labelformat=empty}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+The goal of this exercise is to look at a comparison of auto insurance deductibles and their costs against a range of anticipated repair costs. 
+
+To jump to the plots, click [here](#plot)
+
+## Libraries
+
+For this comparison we will use:
+
+1. `dplyr` for data exploration/manipulation
+2. `ggplot2` for data visualization
+3. `grid` and `gridExtra` for document formatting
+
+```{r libraries, message=FALSE, warning=FALSE}
+library(dplyr)
+library(ggplot2)
+library(grid)
+library(gridExtra)
+```
+## Data
+Next we will create our dataset by manually establishing deductibles and their annual cost (as vectors), and use the `seq` function to generate a sequence of anticipated repair costs. This range will be joined using the `merge` function to create a table of deductibles, costs and repair costs.
+
+Finally, we will use `dplyr`'s mutate function to calculate the repair cost covered after the deductible and a comparison of the cost covered to the annual cost of the deductible.
+```{r data}
+deductible <- c(100,250,500,1000,1500,2500,5000)
+
+deductible_costs <- 
+  data.frame(
+    deductible_factor = 
+      factor(
+        scales::dollar(deductible), 
+        ordered = TRUE,
+        levels = scales::dollar(deductible)[order(deductible)]
+      ),
+    deductible = deductible,
+    deductible_cost = c(1262,1193,1093,948,830,652,371)
+  ) %>%
+  merge(
+    .,
+    data.frame(repair_cost = seq(from=100,to=10000,by=100))
+  ) %>%
+  mutate(
+    repair_cost_covered = pmax(repair_cost-deductible,0),
+    deductible_cost_vs_covered_cost = repair_cost_covered/deductible_cost
+  )
+```
+
+## Plot
+
+With the data prepared, we will use `ggplot` to plot the result.
+
+```{r plot_render, anchor="figure", fig.show='hold', out.width="50%",fig.cap="Figure 1: Plot and table comparing deductibles and costs.", fig.subcap=c("Plot", "Table")}
+test <- ggplot(
+  deductible_costs %>% filter(repair_cost < 5000), 
+  aes(x = repair_cost, y = deductible_cost_vs_covered_cost)
+) + 
+  geom_line(aes(color = deductible_factor)) +
+  labs(
+    x = "Repair Cost ($)",
+    y = "Repair Cost Covered vs Deductible Cost ($)",
+    color = "Deductible"
+  ) +
+  scale_colour_brewer(palette = "Set1") +
+  scale_x_continuous(labels = scales::dollar_format(prefix="$")) +
+  scale_y_continuous(
+    labels = function(x){paste0(x*100, "%")},
+    breaks = round(
+      seq(
+        min(deductible_costs$deductible_cost_vs_covered_cost),
+        max(deductible_costs$deductible_cost_vs_covered_cost),
+        by = 1
+      )
+    )
+  )
+
+test2 <- as.data.frame(
+  deductible_costs %>% 
+    group_by(deductible_factor) %>% 
+    summarise(cost = max(deductible_cost)) %>%
+    mutate(cost = scales::dollar(cost))
+)
+
+test
+
+grid.newpage()
+grid.table(d=test2, rows=NULL, cols=c("Deductible", "Deductible Cost"), theme=ttheme_minimal())
+```
