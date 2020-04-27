@@ -68,27 +68,157 @@ def generate_user_updates(n_users=None, n_updates=10):
 
 def remove_outdated_duplicates(updates):
     """
-      remove duplicate updates per unique updates.id - most up-to-date update depends on updates.updated_at
+        remove duplicate updates per unique updates.id - most up-to-date update depends on updates.updated_at
+
+        Args:
+            updates (list[dict]): Dictionary of expected user rows (NEWEST_USER_DATA)
+
+        Yields:
+            dict[dict]:
+                True/False indicating if rows in users table and expected_user_rows_match
     """
     deduped_updates = {}
     for update in updates:
-        deduped_updates[update['id']] = update if update['id'] not in deduped_updates or deduped_updates[update['id']]['updated_at'] < update['updated_at'] else deduped_updates[update['id']]
+        deduped_updates[update['id']] = update \
+                if update['id'] not in deduped_updates or \
+                   deduped_updates[update['id']]['updated_at'] < update['updated_at'] \
+                else deduped_updates[update['id']]
+
     return deduped_updates
 
 
 def update_sqlite_user_without_fetching(deduped_updates):
     """
-      upsert deduped_updates into users table without fetching rows into python for manipulation (aka use SQL)
+        upsert deduped_updates into users table without fetching rows into python for manipulation (aka use SQL)
+
+        Args:
+            deduped_updates (dict): Dictionary of deduped updates to send to database
+
+        Raises:
+            Error: Raises an error if it fails to connect or send an update to the database
     """
-    # YOUR CODE HERE
+    #Connect to SQLite
+    try:
+        conn = sqlite3.connect("temp.db")
+    except:
+        print("Couldn't connect to SQLite in-memory database")
+        raise
+    cur = conn.cursor()
+
+    #Create users table if it doesn't exist
+    create_users = ''' CREATE TABLE IF NOT EXISTS users (
+                            id INTEGER PRIMARY KEY,
+                            name TEXT,
+                            cookies INTEGER,
+                            updated_at INTEGER
+                       ); '''
+    try:
+        cur.execute(create_users)
+        conn.commit()
+    except:
+        print("Couldn't create users table")
+        raise
+
+    #Perform upserts
+    upsert_user = ''' INSERT INTO users (id, name, cookies, updated_at) 
+                      VALUES (?,?,?,?)
+                      ON CONFLICT (id) DO 
+                      UPDATE SET
+                        cookies = ?,
+                        updated_at = ?
+                      WHERE updated_at < ?'''
+
+    for update in deduped_updates.values():
+        try:
+            cur.execute(
+                upsert_user,
+                tuple(update.values()) + (update['cookies'], update['updated_at'], update['updated_at'])
+            )
+            conn.commit()
+        except:
+            print("Failed to upsert user")
+            raise
+
+    cur.close()
+    conn.close()
 
 
 def compare_final_user_rows_without_fetching(expected_user_rows):
     """
-       compare sqlitedb users table rows to values in expected_user_rows by users.id without fetching into python for manipulation (aka use SQL)
+        compare sqlitedb users table rows to values in expected_user_rows by users.id without fetching into python for manipulation (aka use SQL)
+
+        Args:
+            expected_user_rows (dict): Dictionary of expected user rows (NEWEST_USER_DATA)
+
+        Yields:
+            boolean:
+                True/False indicating if rows in users table and expected_user_rows_match
+
+        Raises:
+            Error: Raises an error if it fails to connect or send an update to the database
     """
     all_rows_match = False
-    # YOUR CODE HERE
+
+    #Connect to SQLite
+    try:
+        conn = sqlite3.connect("temp.db")
+    except:
+        print("Couldn't connect to SQLite database")
+        raise
+    cur = conn.cursor()
+
+    #Create expected_users table
+    create_expected_users = ''' CREATE TABLE IF NOT EXISTS expected_users (
+                                id INTEGER PRIMARY KEY,
+                                name TEXT,
+                                cookies INTEGER,
+                                updated_at INTEGER
+                           ); '''
+
+    try:
+        cur.execute(create_expected_users)
+        conn.commit()
+    except:
+        print("Couldn't create users table")
+        raise
+
+    #Insert expected user data
+    insert_expected_user = ''' INSERT INTO expected_users (id, name, cookies, updated_at)
+                               VALUES (?,?,?,?);'''
+
+    for expected_user in expected_user_rows.values():
+        try:
+            cur.execute(
+                insert_expected_user,
+                tuple(expected_user.values())
+            )
+            conn.commit()
+        except:
+            print("Failed to insert expected_user")
+            raise
+
+    #Perform difference check against users and expected_users tables
+    difference_check = ''' SELECT *, 'users' AS difference_location FROM users 
+                           EXCEPT 
+                           SELECT *, 'users' AS difference_location FROM expected_users
+                           UNION ALL
+                           SELECT *, 'expected_users' AS difference_location FROM expected_users 
+                           EXCEPT 
+                           SELECT *, 'expected_users' AS difference_location FROM users;
+                           '''
+
+    result = cur.execute(difference_check).fetchall()
+
+    if result.__len__() == 0:
+        all_rows_match = True
+
+    #Clean-up
+    cur.close()
+    conn.close()
+
+    import os
+    os.remove("temp.db")
+
     return all_rows_match
 
 
