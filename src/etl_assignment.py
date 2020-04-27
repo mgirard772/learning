@@ -36,79 +36,81 @@ NEWEST_USER_DATA = {}
 
 
 def generate_user_updates(n_users=None, n_updates=10):
-  """
-    This function returns randomly generated user updates - your code will be tested with default parameter values
+    """
+      This function returns randomly generated user updates - your code will be tested with default parameter values
+  
+      DO NOT EDIT IN FINAL PRODUCT
+    """
+    n_users = randint(1, MAX_USERS) if n_users is None else n_users
 
-    DO NOT EDIT IN FINAL PRODUCT
-  """
-  n_users = randint(1, MAX_USERS) if n_users is None else n_users
+    user_updates = []
 
-  user_updates = []
+    for i in range(0, n_users):
+        for j in range(0, n_updates):
+            user_updates.append({
+                'id': i,
+                'name': f'Joe {i}',
+                'cookies': randint(1, 1000),
+                'updated_at': JANUARY_FIRST_2020_TIMESTAMP_MS + j * ONE_DAY_MS + randint(0, 1000)
+            })
 
-  for i in range(0, n_users):
-    for j in range(0, n_updates):
-      user_updates.append({
-        'id': i,
-        'name': f'Joe {i}',
-        'cookies': randint(1, 1000),
-        'updated_at': JANUARY_FIRST_2020_TIMESTAMP_MS + j * ONE_DAY_MS + randint(0, 1000)
-      })
+    for user_update in user_updates:
+        NEWEST_USER_DATA[user_update['id']] = user_update if user_update['id'] not in NEWEST_USER_DATA or NEWEST_USER_DATA[user_update['id']]['updated_at'] < user_update['updated_at'] else NEWEST_USER_DATA[user_update['id']]
 
-  for user_update in user_updates:
-    NEWEST_USER_DATA[user_update['id']] = user_update if user_update['id'] not in NEWEST_USER_DATA or NEWEST_USER_DATA[user_update['id']]['updated_at'] < user_update['updated_at'] else NEWEST_USER_DATA[user_update['id']]
+    shuffled_user_updates = []
+    while (len(user_updates)):
+        user_update = user_updates.pop()
+        random_index = randint(0, len(shuffled_user_updates))
+        shuffled_user_updates.insert(random_index, user_update)
 
-  shuffled_user_updates = []
-  while (len(user_updates)):
-    user_update = user_updates.pop()
-    random_index = randint(0, len(shuffled_user_updates))
-    shuffled_user_updates.insert(random_index, user_update)
-
-  return shuffled_user_updates
+    return shuffled_user_updates
 
 
 def remove_outdated_duplicates(updates):
-  """
-    remove duplicate updates per unique updates.id - most up-to-date update depends on updates.updated_at
-  """
-  deduped_updates= []
-  return deduped_updates
+    """
+      remove duplicate updates per unique updates.id - most up-to-date update depends on updates.updated_at
+    """
+    deduped_updates = {}
+    for update in updates:
+        deduped_updates[update['id']] = update if update['id'] not in deduped_updates or deduped_updates[update['id']]['updated_at'] < update['updated_at'] else deduped_updates[update['id']]
+    return deduped_updates
 
 
 def update_sqlite_user_without_fetching(deduped_updates):
-  """
-    upsert deduped_updates into users table without fetching rows into python for manipulation (aka use SQL)
-  """
-  # YOUR CODE HERE
+    """
+      upsert deduped_updates into users table without fetching rows into python for manipulation (aka use SQL)
+    """
+    # YOUR CODE HERE
 
 
 def compare_final_user_rows_without_fetching(expected_user_rows):
-  """
-     compare sqlitedb users table rows to values in expected_user_rows by users.id without fetching into python for manipulation (aka use SQL)
-  """
-  all_rows_match = False
-  # YOUR CODE HERE
-  return all_rows_match
+    """
+       compare sqlitedb users table rows to values in expected_user_rows by users.id without fetching into python for manipulation (aka use SQL)
+    """
+    all_rows_match = False
+    # YOUR CODE HERE
+    return all_rows_match
 
 
 def run_etl_sim(runs):
-  """
-    runs our little etl sim - feel free to edit for debugging but must remain unedited in final product
-  """
-  for _ in range(0, runs):
-    updates = generate_user_updates(1,2)
-    deduped_updates = remove_outdated_duplicates(updates)
-    update_sqlite_user_without_fetching(deduped_updates)
-  
-  if compare_final_user_rows_without_fetching(NEWEST_USER_DATA):
-    print("Success! User rows match expected values.")
-  else:
-    print("Failure! User rows do not match expected values.")
+    """
+      runs our little etl sim - feel free to edit for debugging but must remain unedited in final product
+    """
+    for _ in range(0, runs):
+        updates = generate_user_updates(1,2)
+        deduped_updates = remove_outdated_duplicates(updates)
+        update_sqlite_user_without_fetching(deduped_updates)
+
+    if compare_final_user_rows_without_fetching(NEWEST_USER_DATA):
+        print("Success! User rows match expected values.")
+    else:
+        print("Failure! User rows do not match expected values.")
 
 if __name__ == '__main__':
-  runs = None
-  try:
-    runs = int(argv[1], 10)
-  except:
-    print("usage: python etl_assignment.py [runs]")
-    raise
-  run_etl_sim(runs)
+    runs = None
+    try:
+        runs = int(argv[1], 10)
+    except:
+        print("usage: python etl_assignment.py [runs]")
+        raise
+    run_etl_sim(runs)
