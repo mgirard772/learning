@@ -101,7 +101,7 @@ def update_sqlite_user_without_fetching(deduped_updates):
     try:
         conn = sqlite3.connect("temp.db")
     except:
-        print("Couldn't connect to SQLite in-memory database")
+        print("Couldn't connect to SQLite database")
         raise
     cur = conn.cursor()
 
