@@ -1,0 +1,230 @@
+---
+title: "Coursera - Predictive Modeling Analytics - Week 2"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+This markdown will walk through the Week 2 assignment for the Coursera course Predictive Modeling Analytics.
+
+## Libraries
+The following libraries are used:
+
+```{r libraries, message=FALSE, warning=FALSE}
+library(dplyr)
+library(openxlsx)
+```
+
+## Reading Data
+
+The first part of this assignment requires us to read in data and filter it. Before we can do this though, we must first acquire the data. Because of the authentication method involved in retrieving the file, you must download the file manually, then read it in. This code assumes the file has been downloaded to the `data` folder in the project root, and is named `crp_data_clean.xlsx`. The code below reads in the file using `openxlsx` and filters the data using `dplyr`. It then reports the rows remaining after filtering and the sum of `ExpirationMonth` as requested for the assignment.
+
+```{r read_data}
+data <- read.xlsx("../data/crp_data_clean.xlsx")
+  
+data_filtered <- data %>%
+  filter(Reward != 0 & NumStores != 0 & ExpirationMonth != '999') %>%
+  mutate(
+    ExpirationMonth = as.numeric(ExpirationMonth),
+    RewardSize = as.numeric(RewardSize)
+  )
+
+message("Original rows: ", nrow(data))
+message("Rows remaining: ",nrow(data_filtered))
+message("Sum of Expiration Month: ", sum(data_filtered$ExpirationMonth))
+```
+
+## Single Regression Models
+
+The next part of the assignment asks us to train multiple, single regression models using a single predictor to predict `ExpirationMonth`. The code below creates a vector of the suggested variables and uses `sapply` to create a list of all the different models using a defined function. Finally, it prints the R-Squared for each (in descending order) and displays the summary containing the coefficient and intercept information for the best model (the one using the `NumStores` predictor).
+
+```{r single_regression}
+vars <- 
+  c(
+    "Salerank", 
+    "X2013USSales", 
+    "X2013WorldSales", 
+    "NumStores", 
+    "RewardSize", 
+    "ProfitMargin"
+  )
+
+train_single_var_model <- function(var, target, data){
+  model <- lm(as.formula(paste(target, "~", var)), data)
+  result <- data.frame(
+    "Predictor" = var,
+    "R-squared" = summary(model)$r.squared,
+    "Adj_R-Squared" = summary(model)$adj.r.squared,
+    stringsAsFactors = FALSE
+  )
+  return(list("result" = result, "model"=model))
+}
+
+models <- 
+  sapply(
+    vars, 
+    train_single_var_model, 
+    target="ExpirationMonth", 
+    data = data_filtered, 
+    simplify = FALSE
+  )
+results <- do.call(rbind,sapply(models, function(x){return(x$result)}, simplify = FALSE))
+rownames(results) <- NULL
+results_order <- order(results$R.squared,decreasing = TRUE)
+print(results[results_order,])
+
+summary(models[[as.character(results$Predictor[results_order[1]])]]$model)
+```
+
+## Data Transformation
+The next part of the assignment asks us to transform different elements of the data and assess the result. There are four combinations of transformation:
+
+1. No transformation
+2. Transform the predictor variable
+3. Transform the target variable
+4. Transform both variables
+
+The code below manually executes each of these cases and coallates the results.
+```{r data_transform}
+transform_list <- list()
+
+temp_model <- 
+  lm(
+    ExpirationMonth ~ NumStores, 
+    data = data_filtered
+  )
+
+transform_list[["none"]] <- list("model" = temp_model, "data_transformed" = "none")
+
+temp_model <- 
+  lm(
+    ExpirationMonth ~ NumStores, 
+    data = data_filtered %>% mutate(NumStores = log(NumStores))
+  )
+
+transform_list[["predictor"]] <- list("model" = temp_model, "data_transformed" = "predictor")
+
+temp_model <- 
+  lm(
+    ExpirationMonth ~ NumStores, 
+    data = data_filtered %>% mutate(ExpirationMonth = log(ExpirationMonth))
+  )
+
+transform_list[["target"]] <- list("model" = temp_model, "data_transformed" = "target")
+
+temp_model <- 
+  lm(
+    ExpirationMonth ~ NumStores, 
+    data = data_filtered %>% 
+      mutate(
+        ExpirationMonth = log(ExpirationMonth),
+        NumStores = log(NumStores)
+      )
+  )
+
+transform_list[["both"]] <- list("model" = temp_model, "data_transformed" = "both")
+
+coallate_results <- function(x){
+  extract <- function(y){
+    return(
+      data.frame(
+        "data_transformed" = y$data_transformed,
+        "R-Squared" = summary(y$model)$r.squared,
+        stringsAsFactors = FALSE
+      )
+    )
+  }
+  return(sapply(x, extract, simplify = FALSE))
+}
+
+results <- do.call(rbind,coallate_results(transform_list))
+rownames(results) <- NULL
+print(results)
+```
+
+## Multiple Regression Models
+The next part of the assigment asks us to increase the prective power of the model by adding one additional variable to the model that uses `NumStores` as it's primary predictor. The code below creates a list of 2 variable combinations from the original variable list to pair with `NumStores` and implements function to train models that accepts a character vector of predictor variables, a character string for a target, and a data frame for data.
+
+While one might assume the variable with next best R-Squared for the single regression model will be the best predictor, this assumption is not necessarily correct, as different variables interact different with one another.
+
+```{r multiple_regression}
+#Using expand.grid, get a list
+var_comb <- 
+  lapply(
+    as.list(as.data.frame(t(expand.grid("NumStores", vars[!(vars %in% c("NumStores"))])))), 
+    as.character
+  )
+
+#Using expand.grid, get a collapsed character vector
+var_comb2 <- 
+  sapply(
+    as.list(as.data.frame(t(expand.grid("NumStores", vars[!(vars %in% c("NumStores"))])))), 
+    function(x){paste(x, collapse="+")}
+  )
+names(var_comb2) <- NULL
+
+#Using combn, get a list
+var_comb3 <-
+  combn(vars, 2, simplify = FALSE)
+var_comb3 <- var_comb3[sapply(var_comb3, function(x){"NumStores" %in% x})]
+
+#Model training function
+train_multi_var_model <- function(vars, target, data){
+  model <- lm(as.formula(paste(target, "~", paste(vars, collapse = "+"))), data)
+  result <- data.frame(
+    "Predictor" = paste(vars, collapse = "+"),
+    "R-squared" = summary(model)$r.squared,
+    "Adj_R-Squared" = summary(model)$adj.r.squared 
+  )
+  return(list("result" = result, "model"=model))
+}
+
+#Train on variable combinations and store models and results
+models <- 
+  sapply(
+    var_comb, 
+    train_multi_var_model, 
+    target="ExpirationMonth", 
+    data = data_filtered, 
+    simplify = FALSE
+  )
+
+#Assign proper names to list
+names(models) <- sapply(var_comb, function(x){paste(x, collapse="+")})
+results <- do.call(rbind,sapply(models, function(x){return(x$result)}, simplify = FALSE))
+rownames(results) <- NULL
+results_order <- order(results$R.squared,decreasing = TRUE)
+print(results[results_order,])
+
+best_model <- models[[order(results$R.squared,decreasing = TRUE)[1]]]$model
+
+summary(best_model)
+retailer_residual <- data.frame(
+  retailer = as.character(data_filtered$Retailer),
+  abs_residual = abs(best_model$residuals),
+  stringsAsFactors = FALSE
+)
+head(
+  retailer_residual[order(retailer_residual$abs_residual, decreasing = TRUE),], 
+  5
+)
+```
+`NumStores+X2013USSales` provides the best R-Squared by a narrow margin, and is not a large improvement over the original model with only `NumStores`. To cover the details of the assignment, the R-Squared for this model was *`r summary(best_model)$r.squared`* and the retailer with the highest residual was `TJX`. Details for the final question are laid out below.
+
+## Last Question
+The last question is a bit confusing, because as you can see `Nieman Marcus` has the lowest residual, but it is not an option to select as an answer to the question. Also, some of the options listed are not present as they do not have rewards programs and were filtered out in the beginning of the assignment. To make sense of this, we will limit the results to just the retailer's listed in the question and choose the one with the lowest residual.
+```{r last_question}
+head(
+  retailer_residual[order(retailer_residual$abs_residual, decreasing = FALSE),], 
+  5
+)
+
+retailers_in_question <- c("Macy's", "Whole Foods", "TJX", "Starbucks")
+head(
+  retailer_residual[order(retailer_residual$abs_residual, decreasing = FALSE),] %>% filter(retailer %in% retailers_in_question), 
+  5
+)
+```

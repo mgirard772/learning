@@ -1,0 +1,136 @@
+---
+title: "Coursera - Predictive Modeling Analytics - Week 3"
+author: "Matt Girard"
+date: "5/9/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+This document will walk through the Week 3 assignment for the Coursera Predictive Modeling Analytics course. This course focuses on classification using Logistic Regression.
+
+## Libraries
+The following libraries are used:
+
+```{r libraries, message=FALSE, warning=FALSE}
+library(dplyr)
+library(openxlsx)
+library(caret)
+library(reshape2)
+```
+
+## Reading and Preparing Data
+Per the assignment, we will continue working with the customer rewards program dataset. The code below reads in the data and creates the two binary dummy columns as called for by the assignment.
+```{r data_prep}
+data <- read.xlsx("../data/crp_data_clean.xlsx") %>%
+  mutate(
+    grocery = ifelse(IndustryType == "Grocery", 1, 0),
+    discount = ifelse(IndustryType == "Discount", 1, 0)
+  )
+```
+
+## Training initial model
+Next, we train a Logistic Regression model using `Reward` as the target variable and our dummy `grocery` and `discount` variables as our predictors. Note that `family` is set to `"binomial"` meaning that our output/target is between 0 and 1.
+```{r first_model}
+model <- glm(Reward~grocery+discount, family = "binomial", data = data)
+summary(model)
+```
+
+## Confusion Matrix
+To display our confusion matrix, we use the `predict` function to get probability predictions for our data, then use `ifelse` to create discrete predictions that align with our desired binary output.
+
+For this, we use a standard 0.5 as our cutoff.
+```{r confusion}
+prob <- predict(model, data=data, type="response")
+pred <- ifelse(prob > 0.5, 1, 0)
+confusionMatrix(factor(pred), factor(data$Reward))
+```
+
+## Data Partitioning
+The second part of the assignment calls for data partition using a 60/40 split for training and testing sets respectively.
+
+**Note: Due to variations in how caret or R's random number generator work compared to XLMiner, you will need to use XLMiner to get the exact answers required to pass the assignment's automated grader.**
+
+Partitioning can be done using a variety of methods, in a commented section I use R's `sample.int` function to generate a vector of random indecies that I can use to subset my data, using the `size` parameter to limit the numbers selected to match the desired split size. We negate this set using the `-` operator to get our testing set.
+
+An easier method is to use the `createDataPartition` method offered by `caret` which allows you to specify the percent using the `p` argument, as well as a vector to partition by. In this case I used `Reward`, which will ensure that the distribution of `Reward` in our training and testing sets is the same as the original.
+
+```{r partition}
+set.seed(12345)
+#train_rows <- sample.int(n = nrow(data), size = floor(.60*nrow(data)), replace = F)
+train_rows <- createDataPartition(factor(data$Reward), p=0.6,list=FALSE)
+train <- data[train_rows,]
+test <- data[-train_rows,]
+```
+
+To check distributions among the different datasets I create a function, `get_dist`, to aid in prepapring the summary. 
+
+I then plot the results using ggplot. Alternatively, we can print to console using dcast.
+
+```{r distribution_check}
+get_dist <- function(x, dataset_label, target){
+  distributions <- x %>%
+  group_by(!! target) %>%
+  summarise(count = n()) %>%
+  ungroup() %>%
+  mutate(
+    percent = count/sum(count),
+    dataset = dataset_label,
+    dataset_header = paste0(dataset, " | n=", sum(count))
+  ) %>%
+  select(dataset, dataset_header, !! target, count, percent)
+}
+
+dist <- 
+  rbind(
+    get_dist(data, "original", quo(Reward)),
+    get_dist(train, "train", quo(Reward)),
+    get_dist(test, "test", quo(Reward))
+  )
+
+ggplot(dist, aes(x=factor(Reward), y=percent)) +
+  geom_bar(stat="identity") +
+  facet_wrap(vars(dataset_header)) + 
+  scale_x_discrete() +
+  scale_y_continuous(
+    labels = scales::percent,
+    breaks = scales::pretty_breaks(n = 5)
+  ) +
+  geom_text(
+    aes(label=scales::percent(percent)),
+    vjust = -0.5,
+    size = 3
+  )
+
+dcast(dist[,c("dataset", "Reward", "percent")], dataset~Reward)
+
+```
+
+Both methods show that our target variable distirbution is the same across all datasets.
+
+We then train our model using the training dataset and display the summary.
+
+```{r partition_model}
+model <- glm(Reward~grocery+discount, family="binomial", data=train)
+summary(model)
+```
+
+With the model trained, we get predictions for our test set and create a confusion matrix.
+
+```{r partition_confusion}
+prob <- predict(model,newdata = test, type="response")
+pred <- ifelse(prob > 0.5, 1, 0)
+confusionMatrix(factor(pred), factor(test$Reward))
+```
+
+As the assignment suggests, we can modify our cutoff to be 0.3 instead of the standard 0.5. However, this ends up giving us all positive predictions.
+
+```{r partition_confusion_new_thresh}
+prob <- predict(model,newdata = test, type="response")
+pred <- ifelse(prob > 0.3, 1, 0)
+confusionMatrix(factor(pred), factor(test$Reward))
+```

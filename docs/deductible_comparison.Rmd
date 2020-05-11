@@ -54,7 +54,8 @@ deductible_costs <-
   ) %>%
   mutate(
     repair_cost_covered = pmax(repair_cost-deductible,0),
-    deductible_cost_vs_covered_cost = repair_cost_covered/deductible_cost
+    deductible_cost_vs_covered_cost = repair_cost_covered/deductible_cost,
+    monthly_deductible_cost = deductible_cost/12
   )
 ```
 
@@ -89,12 +90,14 @@ test <- ggplot(
 test2 <- as.data.frame(
   deductible_costs %>% 
     group_by(deductible_factor) %>% 
-    summarise(cost = max(deductible_cost)) %>%
-    mutate(cost = scales::dollar(cost))
+    summarise(
+      cost = scales::dollar(max(deductible_cost)),
+      monthly_cost = scales::dollar(max(monthly_deductible_cost))
+    )
 )
 
 test
 
 grid.newpage()
-grid.table(d=test2, rows=NULL, cols=c("Deductible", "Deductible Cost"), theme=ttheme_minimal())
+grid.table(d=test2, rows=NULL, cols=c("Deductible", "Annual Cost", "Monthly Cost"), theme=ttheme_minimal())
 ```
