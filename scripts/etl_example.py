@@ -241,6 +241,6 @@ if __name__ == '__main__':
     try:
         runs = int(argv[1], 10)
     except:
-        print("usage: python etl_assignment.py [runs]")
+        print("usage: python etl_example.py [runs]")
         raise
     run_etl_sim(runs)
